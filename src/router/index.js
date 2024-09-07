@@ -1,18 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomePage from '../components/HomePage.vue';
-import AboutPage from '../components/AboutPage.vue';
+
+import PasswordManager from '../pages/PasswordManager.vue';
+import GroupChat from '../pages/GroupChat.vue';
+import FileSharing from '../pages/FileSharing.vue';
 
 const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: HomePage,
-  },
-  {
-    path: '/about',
-    name: 'About',
-    component: AboutPage,
-  },
+ 
+  { path: '/password-manager', name: 'PasswordManager', component: PasswordManager },
+  { path: '/group-chat', name: 'GroupChat', component: GroupChat },
+  { path: '/', name: 'FileSharing', component: FileSharing },
 ];
 
 const router = createRouter({
