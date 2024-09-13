@@ -1,7 +1,14 @@
 <template>
   <div class="container mt-5">
-    <h2 class="text-center">{{ isEditing ? 'Edit Password' : 'Add New Password' }}</h2>
-    <form @submit.prevent="isEditing ? updatePassword() : addPassword()" class="password-form">
+    <h2 class="text-center">Add New Password</h2>
+
+     <!-- Success or error message -->
+     <div v-if="message" class="alert" :class="{'alert-success': isSuccess, 'alert-danger': !isSuccess}" role="alert">
+      {{ message }}
+    </div>
+    <br>
+
+    <form @submit.prevent="addPassword" class="password-form">
       <div class="form-group">
         <label for="title">Title</label>
         <input v-model="newPassword.title" id="title" type="text" class="form-control" placeholder="Enter a title" required />
@@ -17,146 +24,85 @@
         <input v-model="newPassword.password" id="password" type="password" class="form-control" placeholder="Enter your password" required />
       </div>
 
-      <div class="form-group">
-        <label for="notes">Notes</label>
-        <textarea v-model="newPassword.notes" id="notes" class="form-control" placeholder="Additional notes (optional)"></textarea>
-      </div>
-
-      <button type="submit" class="btn btn-secondary btn-block">{{ isEditing ? 'Update Password' : 'Add Password' }}</button>
+      <button type="submit" class="btn btn-primary btn-block black">Add Password</button>
     </form>
 
-    <!-- Password List -->
-    <div class="mt-5">
-      <h2 class="text-center">Passwords</h2>
-      <ul class="list-group">
-        <li class="list-group-item" v-for="(password, index) in passwords" :key="index">
-          <div>
-            <h4>{{ password.title }}</h4>
-            <p><strong>Username:</strong> {{ password.username }}</p>
-            <p><strong>Password:</strong> {{ password.password }}</p>
-            <p><strong>Notes:</strong> {{ password.notes }}</p>
-          </div>
-          <div class="btn-group">
-            <button @click="editPassword(index)" class="btn btn-secondary">Edit</button>
-            <button @click="deletePassword(index)" class="btn btn-danger">Delete</button>
-          </div>
-        </li>
-      </ul>
-    </div>
+    <button class="btn btn-link mt-3" @click="goToPasswordList">View Saved Passwords</button>
+    <!-- Button to go to the Password Generator page -->
+    <router-link to="/Suggestbox" class="btn btn-primary mt-3">Go to Password Generator</router-link>
+
+  
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { openDB } from 'idb';
+import { useRouter } from 'vue-router';
+import CryptoJS from 'crypto-js';
 
 export default {
-  name: 'PasswordManager',
   setup() {
+    const router = useRouter();
+    const encryptionKey = 'ManagerOnLock';
+    const newPassword = ref({
+      title: '',
+      username: '',
+      password: ''
+    });
+
+    const message = ref(''); // Message to show success or error
+    const isSuccess = ref(false); // Track if message is success or error
+
     const dbPromise = openDB('passwordManagerDB', 1, {
       upgrade(db) {
         db.createObjectStore('passwords', { keyPath: 'id', autoIncrement: true });
       }
     });
 
-    const passwords = ref([]);
-    const newPassword = ref({
-      title: '',
-      username: '',
-      password: '',
-      notes: ''
-    });
-    const isEditing = ref(false);
-    const currentEditIndex = ref(null);
-
-    onMounted(async () => {
-      const db = await dbPromise;
-      const storedPasswords = await db.getAll('passwords');
-      passwords.value = storedPasswords;
-    });
-
     async function addPassword() {
-      if (newPassword.value.title && newPassword.value.username && newPassword.value.password) {
-        const db = await dbPromise;
-        const id = await db.put('passwords', { ...newPassword.value });
-        passwords.value.push({ id, ...newPassword.value });
-        resetForm();
+      const db = await dbPromise;
+      try {
+           // Encrypt the password before saving
+        const encryptedPassword = CryptoJS.AES.encrypt(newPassword.value.password, encryptionKey).toString();
+
+        await db.put('passwords', {
+          title: newPassword.value.title,
+          username: newPassword.value.username,
+          password: encryptedPassword // Save the encrypted password
+        });
+        message.value = 'Password added successfully'; // Set success message
+        isSuccess.value = true;
+        newPassword.value = { title: '', username: '', password: '' }; // Clear the form
+      } catch (error) {
+        console.error('Failed to add password', error);
+        message.value = 'Error adding password'; // Set error message
+        isSuccess.value = false;
       }
+
+      // Hide message after 3 seconds
+      setTimeout(() => {
+        message.value = '';
+      }, 3000);
     }
 
-    async function deletePassword(index) {
-      const db = await dbPromise;
-      const passwordToDelete = passwords.value[index];
-      await db.delete('passwords', passwordToDelete.id);
-      passwords.value.splice(index, 1);
-    }
-
-    function editPassword(index) {
-      newPassword.value = { ...passwords.value[index] };
-      isEditing.value = true;
-      currentEditIndex.value = index;
-    }
-
-    async function updatePassword() {
-      const db = await dbPromise;
-      const id = passwords.value[currentEditIndex.value].id;
-      await db.put('passwords', { id, ...newPassword.value });
-      passwords.value[currentEditIndex.value] = { id, ...newPassword.value };
-      resetForm();
-    }
-
-    function resetForm() {
-      newPassword.value = { title: '', username: '', password: '', notes: '' };
-      isEditing.value = false;
-      currentEditIndex.value = null;
+    function goToPasswordList() {
+      router.push('/password-list');
     }
 
     return {
-      passwords,
       newPassword,
       addPassword,
-      deletePassword,
-      editPassword,
-      updatePassword,
-      isEditing
+      goToPasswordList,
+      message,
+      isSuccess
     };
   }
 };
 </script>
 
+
 <style scoped>
-/* General form styling */
-.password-form {
-  background-color: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
-.password-form .form-group {
-  margin-bottom: 15px;
-}
-
-.password-form .btn {
-  margin-top: 10px;
-}
-
-/* Saved passwords list */
-.list-group-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.list-group-item h4 {
-  margin-bottom: 0;
-}
-
-.btn-group {
-  display: flex;
-  gap: 10px;
-}
-
 .container {
   max-width: 600px;
   margin: auto;
@@ -164,6 +110,14 @@ export default {
 
 .mt-5 {
   margin-top: 3rem;
-  margin-bottom: 200px;
+}
+
+.alert {
+  margin-top: 20px;
+}
+
+.black{
+  background-color: grey;
+  border: 1px solid white;
 }
 </style>
