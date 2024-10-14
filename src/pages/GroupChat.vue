@@ -40,6 +40,16 @@ export default {
     },
 
     createGroup() {
+      // Check if Wi-Fi is active before creating the group
+      if ('connection' in navigator) {
+        const connectionType = navigator.connection.type;
+
+        if (connectionType !== 'wifi') {
+          alert("Please turn on your Wi-Fi or Hotspot to create a group.");
+          return; // Prevent group creation if not on Wi-Fi
+        } 
+      }
+
       if (this.groupName) {
         // Redirect to the ChatRoom with groupName as a route parameter and profilePic as a query parameter
         this.$router.push({
