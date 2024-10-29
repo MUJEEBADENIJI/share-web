@@ -5,19 +5,17 @@
     <!-- Navigation Pills for Share and Receive Buttons -->
     <ul class="nav nav-pills justify-content-center">
       <li class="nav-item">
-        <!-- Share Files Pill -->
         <a
-          class="nav-link"
+          class="nav-link file-button"
           :class="{ active: isActive === 'share' }"
-          @click="generateOffer"
+          @click="selectFiles"
         >
           Share Files
         </a>
       </li>
       <li class="nav-item">
-        <!-- Receive Files Pill -->
         <a
-          class="nav-link"
+          class="nav-link file-button"
           :class="{ active: isActive === 'receive' }"
           @click="startReceiving"
         >
@@ -25,12 +23,6 @@
         </a>
       </li>
     </ul>
-
-    <!-- Display QR code after generating an offer -->
-    <div v-if="qrCodeData" class="qr-code-container">
-      <h3>Scan this QR Code to Connect:</h3>
-      <canvas ref="qrCanvas"></canvas>
-    </div>
 
     <!-- Hidden File Input for selecting files -->
     <input
@@ -43,103 +35,87 @@
   </div>
 </template>
 
-
-import QRCode from 'qrcode';
-
+<script>
 export default {
   data() {
     return {
       isActive: '', // Track active state (either 'share' or 'receive')
       files: [],    // Store selected files
-      peerConnection: null, // WebRTC peer connection instance
       ws: null,     // WebSocket instance
-      qrCodeData: null, // Store QR code data
+    };
+  },
+  created() {
+    this.ws = new WebSocket('ws://localhost:8080');
+    this.ws.onmessage = (event) => {
+      const blob = new Blob([event.data]);
+      const url = URL.createObjectURL(blob);
+      this.downloadFile(url);
     };
   },
   methods: {
-    // Generate WebRTC offer when "Share Files" is clicked
-    async generateOffer() {
-      this.isActive = 'share'; // Mark "Share Files" as active
-      
-      // Create a new WebRTC peer connection
-      this.peerConnection = new RTCPeerConnection();
-      
-      // Generate the offer for WebRTC connection
-      const offer = await this.peerConnection.createOffer();
-      await this.peerConnection.setLocalDescription(offer);
-      
-      // Generate a QR code with the offer
-      this.qrCodeData = offer.sdp;
-      this.generateQRCode(this.qrCodeData);
-    },
-
-    // Generate the QR code for the offer
-    generateQRCode(data) {
-      const canvas = this.$refs.qrCanvas;
-      QRCode.toCanvas(canvas, data, function (error) {
-        if (error) console.error(error);
-        console.log('QR code generated!');
-      });
-    },
-
-    // Trigger file selection dialog when "Share Files" is clicked
     selectFiles() {
-      this.$refs.fileInput.click(); // Open file dialog
+      this.isActive = 'share';
+      this.$refs.fileInput.click();
     },
-
-    // Handle selected files and trigger sending them via WebSocket
     onFileChange(event) {
-      const selectedFiles = Array.from(event.target.files); // Get selected files
-      this.files = selectedFiles; // Store the selected files
-      this.sendFiles(); // Send files after selection
+      const selectedFiles = Array.from(event.target.files);
+      this.files = selectedFiles;
+      this.sendFiles();
     },
-
-    // Send selected files via WebSocket
     sendFiles() {
       if (this.files.length > 0) {
         this.files.forEach((file) => {
           const reader = new FileReader();
           reader.onload = (e) => {
-            this.ws.send(e.target.result); // Send file data through WebSocket
+            this.ws.send(e.target.result);
           };
-          reader.readAsArrayBuffer(file); // Read the file as ArrayBuffer
+          reader.readAsArrayBuffer(file);
         });
       } else {
         alert('No files selected for sharing.');
       }
     },
-
-    // Start receiving files (this sets the app into a receiving state)
     startReceiving() {
-      this.isActive = 'receive'; // Mark "Receive Files" as active
+      this.isActive = 'receive';
       alert('Ready to receive files.');
+    },
+    downloadFile(url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'received-file';
+      a.click();
+      URL.revokeObjectURL(url);
     }
   }
 };
-
+</script>
 
 <style scoped>
 .file-share {
   text-align: center;
   margin-top: 240px;
-  margin-left: 35px;
-  margin-right: 35px;
 }
 
-.nav-pills .nav-link {
-  margin: 10px;
-  padding: 10px 30px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.nav-pills .nav-link.active {
-  background-color: #007bff; /* Bootstrap's primary color for active state */
+.nav-pills .file-button {
+  border-radius: 50px;
+  padding: 15px 40px;
+  font-size: 18px;
+  font-weight: bold;
   color: white;
+  background-color: #007bff; /* Blue color */
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
 }
 
-/* Add spacing around the QR code */
-.qr-code-container {
-  margin-top: 20px;
+.nav-pills .file-button:hover {
+  transform: scale(1.05);
+}
+
+.nav-pills .file-button.active {
+  background-color: #0056b3; /* Darker blue for active state */
+}
+
+.nav-pills .nav-link:not(.active) {
+  background-color: #007bff; /* Reset background color for inactive links */
 }
 </style>
