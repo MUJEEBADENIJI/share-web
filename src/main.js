@@ -10,4 +10,9 @@ import 'jquery';
 import 'popper.js';
 import 'bootstrap/dist/js/bootstrap.min.js';
 
+import { inject } from "@vercel/analytics";
+
+inject(); // This sets up Vercel Analytics for your app
+
+
 createApp(App).use(router).mount('#app');
